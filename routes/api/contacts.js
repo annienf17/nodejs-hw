@@ -10,10 +10,14 @@ const {
 
 const router = express.Router();
 
+const phoneRegex = /^[0-9]{3}-[0-9]{3}-[0-9]{4}$/;
+
 const contactSchema = Joi.object({
   name: Joi.string().required(),
   email: Joi.string().email().required(),
-  phone: Joi.string().required(),
+  phone: Joi.string().pattern(phoneRegex).required().messages({
+    "string.pattern.base": "Phone number must be in the format XXX-XXX-XXXX",
+  }),
 });
 
 router.get("/", async (req, res, next) => {
