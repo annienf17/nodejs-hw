@@ -14,12 +14,15 @@ app.use(express.json());
 
 app.use("/api/contacts", contactsRouter);
 
+// Middleware obsługujący brakujące trasy
 app.use((req, res) => {
   res.status(404).json({ message: "Not found" });
 });
 
+// Centralny middleware do obsługi błędów
 app.use((err, req, res, next) => {
-  res.status(500).json({ message: err.message });
+  console.error(err.stack);
+  res.status(500).json({ message: "Internal Server Error" });
 });
 
 module.exports = app;
