@@ -24,6 +24,10 @@ app.use((req, res) => {
 // Centralny middleware do obsługi błędów
 app.use((err, req, res, next) => {
   console.error(err.stack);
+  if (err.code === 11000) {
+    // MongoDB duplicate key error
+    return res.status(409).json({ message: "Contact already exists" });
+  }
   res.status(500).json({ message: "Internal Server Error" });
 });
 
