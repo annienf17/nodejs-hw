@@ -28,8 +28,8 @@ const updateStatusContact = async (contactId, favorite) => {
 module.exports = {
   listContacts,
   getContactById,
-  removeContact,
   addContact,
+  removeContact,
   updateContact,
   updateStatusContact,
 };

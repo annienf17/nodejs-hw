@@ -2,6 +2,7 @@ const express = require("express");
 const logger = require("morgan");
 const cors = require("cors");
 const connectDB = require("./db");
+require("dotenv").config();
 
 const contactsRouter = require("./routes/api/contacts");
 
@@ -15,15 +16,16 @@ app.use(express.json());
 
 app.use("/api/contacts", contactsRouter);
 
+// Middleware obsługujący brakujące trasy
 app.use((req, res) => {
   res.status(404).json({ message: "Not found" });
 });
 
+// Centralny middleware do obsługi błędów
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: "Internal Server Error" });
 });
 
 connectDB();
-
 module.exports = app;
