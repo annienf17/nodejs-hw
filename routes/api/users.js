@@ -2,7 +2,8 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
-const User = require("../../models/User");
+const User = require("../../models/user");
+const auth = require("../../middleware/auth");
 
 const router = express.Router();
 
@@ -53,8 +54,10 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Email or password is wrong" });
     }
 
+    console.log("Plain Password:", password);
     console.log("Stored Hashed Password:", user.password);
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log("Password Valid:", isPasswordValid);
     if (!isPasswordValid) {
       console.log("Invalid password");
       return res.status(401).json({ message: "Email or password is wrong" });
@@ -72,6 +75,22 @@ router.post("/login", async (req, res) => {
     });
   } catch (err) {
     console.error("Server error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/logout", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    user.token = null;
+    await user.save();
+
+    res.status(204).send();
+  } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 });
