@@ -1,122 +1,84 @@
 const express = require("express");
-const Joi = require("joi");
-const {
-  listContacts,
-  getContactById,
-  addContact,
-  removeContact,
-  updateContact,
-  updateStatusContact,
-} = require("../../models/contacts");
-
+const auth = require("../../middleware/auth");
 const router = express.Router();
+const Contact = require("../../models/contactModel");
 
-const phoneRegex = /^[0-9]{3}-[0-9]{3}-[0-9]{4}$/;
-
-const contactSchema = Joi.object({
-  name: Joi.string().required(),
-  email: Joi.string().email().required(),
-  phone: Joi.string().pattern(phoneRegex).required().messages({
-    "string.pattern.base": "Phone number must be in the format XXX-XXX-XXXX",
-  }),
-  favorite: Joi.boolean(),
-});
-
-const favoriteSchema = Joi.object({
-  favorite: Joi.boolean().required(),
-});
-
-const validateContact = (req, res, next) => {
-  const { error } = contactSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({ message: error.details[0].message });
-  }
-  next();
-};
-
-const validateFavorite = (req, res, next) => {
-  const { error } = favoriteSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({ message: "missing field favorite" });
-  }
-  next();
-};
-
-router.get("/", async (req, res, next) => {
+// Example of a protected route to get all contacts
+router.get("/", auth, async (req, res) => {
   try {
-    const contacts = await listContacts();
-    res.status(200).json(contacts);
-  } catch (error) {
-    next(error);
+    const contacts = await Contact.find({ owner: req.user._id });
+    res.json(contacts);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.get("/:contactId", async (req, res, next) => {
+// Example of a protected route to create a new contact
+router.post("/", auth, async (req, res) => {
   try {
-    const contact = await getContactById(req.params.contactId);
-    if (contact) {
-      res.status(200).json(contact);
-    } else {
-      res.status(404).json({ message: "Not found" });
+    const { name, email, phone, favorite } = req.body;
+    const newContact = new Contact({
+      name,
+      email,
+      phone,
+      favorite,
+      owner: req.user._id,
+    });
+    const savedContact = await newContact.save();
+    res.status(201).json(savedContact);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Example of a protected route to get a contact by ID
+router.get("/:id", auth, async (req, res) => {
+  try {
+    const contact = await Contact.findOne({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+    if (!contact) {
+      return res.status(404).json({ message: "Contact not found" });
     }
-  } catch (error) {
-    next(error);
+    res.json(contact);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.post("/", validateContact, async (req, res, next) => {
+// Example of a protected route to update a contact by ID
+router.put("/:id", auth, async (req, res) => {
   try {
-    const newContact = await addContact(req.body);
-    res.status(201).json(newContact);
-  } catch (error) {
-    next(error);
+    const { name, email, phone, favorite } = req.body;
+    const updatedContact = await Contact.findOneAndUpdate(
+      { _id: req.params.id, owner: req.user._id },
+      { name, email, phone, favorite },
+      { new: true }
+    );
+    if (!updatedContact) {
+      return res.status(404).json({ message: "Contact not found" });
+    }
+    res.json(updatedContact);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.delete("/:contactId", async (req, res, next) => {
+// Example of a protected route to delete a contact by ID
+router.delete("/:id", auth, async (req, res) => {
   try {
-    const removedContact = await removeContact(req.params.contactId);
-    if (removedContact) {
-      res.status(200).json({ message: "contact deleted" });
-    } else {
-      res.status(404).json({ message: "Not found" });
+    const deletedContact = await Contact.findOneAndDelete({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+    if (!deletedContact) {
+      return res.status(404).json({ message: "Contact not found" });
     }
-  } catch (error) {
-    next(error);
+    res.json({ message: "Contact deleted" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 });
-
-router.put("/:contactId", validateContact, async (req, res, next) => {
-  try {
-    const updatedContact = await updateContact(req.params.contactId, req.body);
-    if (updatedContact) {
-      res.status(200).json(updatedContact);
-    } else {
-      res.status(404).json({ message: "Not found" });
-    }
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.patch(
-  "/:contactId/favorite",
-  validateFavorite,
-  async (req, res, next) => {
-    try {
-      const updatedContact = await updateStatusContact(
-        req.params.contactId,
-        req.body.favorite
-      );
-      if (updatedContact) {
-        res.status(200).json(updatedContact);
-      } else {
-        res.status(404).json({ message: "Not found" });
-      }
-    } catch (error) {
-      next(error);
-    }
-  }
-);
 
 module.exports = router;
