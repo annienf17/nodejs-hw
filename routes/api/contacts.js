@@ -3,17 +3,29 @@ const auth = require("../../middleware/auth");
 const router = express.Router();
 const Contact = require("../../models/contactModel");
 
-// Example of a protected route to get all contacts
+// Endpoint GET /contacts z paginacją
 router.get("/", auth, async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+
   try {
-    const contacts = await Contact.find({ owner: req.user._id });
-    res.json(contacts);
+    const contacts = await Contact.find({ owner: req.user._id })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .exec();
+
+    const count = await Contact.countDocuments({ owner: req.user._id });
+
+    res.status(200).json({
+      contacts,
+      totalPages: Math.ceil(count / limit),
+      currentPage: Number(page),
+    });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// Example of a protected route to create a new contact
+// Endpoint POST /contacts do tworzenia nowego kontaktu
 router.post("/", auth, async (req, res) => {
   try {
     const { name, email, phone, favorite } = req.body;
@@ -31,7 +43,7 @@ router.post("/", auth, async (req, res) => {
   }
 });
 
-// Example of a protected route to get a contact by ID
+// Endpoint GET /contacts/:id do pobierania kontaktu po ID
 router.get("/:id", auth, async (req, res) => {
   try {
     const contact = await Contact.findOne({
@@ -47,7 +59,7 @@ router.get("/:id", auth, async (req, res) => {
   }
 });
 
-// Example of a protected route to update a contact by ID
+// Endpoint PUT /contacts/:id do aktualizacji kontaktu po ID
 router.put("/:id", auth, async (req, res) => {
   try {
     const { name, email, phone, favorite } = req.body;
@@ -65,7 +77,7 @@ router.put("/:id", auth, async (req, res) => {
   }
 });
 
-// Example of a protected route to delete a contact by ID
+// Endpoint DELETE /contacts/:id do usuwania kontaktu po ID
 router.delete("/:id", auth, async (req, res) => {
   try {
     const deletedContact = await Contact.findOneAndDelete({
