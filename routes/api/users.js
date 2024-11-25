@@ -17,6 +17,10 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+const subscriptionSchema = Joi.object({
+  subscription: Joi.string().valid("starter", "pro", "business").required(),
+});
+
 router.post("/signup", async (req, res) => {
   const { error } = signupSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
@@ -106,6 +110,30 @@ router.get("/current", auth, async (req, res) => {
       email: user.email,
       subscription: user.subscription,
     });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Endpoint PATCH /users do aktualizacji subskrypcji użytkownika
+router.patch("/", auth, async (req, res) => {
+  const { error } = subscriptionSchema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+
+  const { subscription } = req.body;
+
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { subscription },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(updatedUser);
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
