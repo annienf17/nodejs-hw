@@ -3,17 +3,22 @@ const auth = require("../../middleware/auth");
 const router = express.Router();
 const Contact = require("../../models/contactModel");
 
-// Endpoint GET /contacts z paginacją
+// Endpoint GET /contacts z paginacją i filtrowaniem
 router.get("/", auth, async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
+  const { page = 1, limit = 20, favorite } = req.query;
+  const filter = { owner: req.user._id };
+
+  if (favorite !== undefined) {
+    filter.favorite = favorite === "true";
+  }
 
   try {
-    const contacts = await Contact.find({ owner: req.user._id })
+    const contacts = await Contact.find(filter)
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .exec();
 
-    const count = await Contact.countDocuments({ owner: req.user._id });
+    const count = await Contact.countDocuments(filter);
 
     res.status(200).json({
       contacts,
