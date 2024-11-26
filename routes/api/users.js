@@ -93,7 +93,7 @@ router.get("/logout", auth, async (req, res) => {
     user.token = null;
     await user.save();
 
-    res.status(204).send();
+    res.status(200).json({ message: "Successfully logged out" });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
