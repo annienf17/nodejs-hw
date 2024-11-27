@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
+const gravatar = require("gravatar");
 const User = require("../../models/user");
 const auth = require("../../middleware/auth");
 
@@ -34,12 +35,18 @@ router.post("/signup", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log("Hashed Password:", hashedPassword);
 
-    const user = new User({ email, password: hashedPassword });
+    const avatarURL = gravatar.url(email, { s: "200", r: "pg", d: "mm" });
+
+    const user = new User({ email, password: hashedPassword, avatarURL });
     await user.save();
 
-    res
-      .status(201)
-      .json({ user: { email: user.email, subscription: user.subscription } });
+    res.status(201).json({
+      user: {
+        email: user.email,
+        subscription: user.subscription,
+        avatarURL: user.avatarURL,
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
@@ -75,7 +82,11 @@ router.post("/login", async (req, res) => {
 
     res.status(200).json({
       token,
-      user: { email: user.email, subscription: user.subscription },
+      user: {
+        email: user.email,
+        subscription: user.subscription,
+        avatarURL: user.avatarURL,
+      },
     });
   } catch (err) {
     console.error("Server error:", err);
@@ -109,6 +120,7 @@ router.get("/current", auth, async (req, res) => {
     res.status(200).json({
       email: user.email,
       subscription: user.subscription,
+      avatarURL: user.avatarURL,
     });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
