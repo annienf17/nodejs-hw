@@ -5,6 +5,7 @@ const connectDB = require("./db");
 require("dotenv").config();
 
 const contactsRouter = require("./routes/api/contacts");
+const usersRouter = require("./routes/api/users");
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/contacts", contactsRouter);
+app.use("/api/users", usersRouter);
 
 // Middleware obsługujący brakujące trasy
 app.use((req, res) => {

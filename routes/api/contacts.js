@@ -1,15 +1,8 @@
 const express = require("express");
 const Joi = require("joi");
-const {
-  listContacts,
-  getContactById,
-  addContact,
-  removeContact,
-  updateContact,
-  updateStatusContact,
-} = require("../../models/contacts");
-
+const auth = require("../../middleware/auth");
 const router = express.Router();
+const Contact = require("../../models/contactModel");
 
 const phoneRegex = /^[0-9]{3}-[0-9]{3}-[0-9]{4}$/;
 
@@ -42,81 +35,138 @@ const validateFavorite = (req, res, next) => {
   next();
 };
 
-router.get("/", async (req, res, next) => {
+// Endpoint GET /contacts z paginacją i filtrowaniem
+router.get("/", auth, async (req, res) => {
+  const { page = 1, limit = 20, favorite } = req.query;
+  const filter = { owner: req.user._id };
+
+  if (favorite !== undefined) {
+    filter.favorite = favorite === "true";
+  }
+
   try {
-    const contacts = await listContacts();
-    res.status(200).json(contacts);
-  } catch (error) {
-    next(error);
+    const contacts = await Contact.find(filter)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .exec();
+
+    const count = await Contact.countDocuments(filter);
+
+    res.status(200).json({
+      contacts,
+      totalPages: Math.ceil(count / limit),
+      currentPage: Number(page),
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.get("/:contactId", async (req, res, next) => {
+// Endpoint POST /contacts do tworzenia nowego kontaktu
+router.post("/", auth, validateContact, async (req, res) => {
   try {
-    const contact = await getContactById(req.params.contactId);
-    if (contact) {
-      res.status(200).json(contact);
-    } else {
-      res.status(404).json({ message: "Not found" });
+    const { name, email, phone, favorite } = req.body;
+
+    // Sprawdzenie, czy kontakt już istnieje
+    const existingContact = await Contact.findOne({
+      email,
+      owner: req.user._id,
+    });
+    if (existingContact) {
+      return res.status(409).json({ message: "Contact already exists" });
     }
-  } catch (error) {
-    next(error);
+
+    const newContact = new Contact({
+      name,
+      email,
+      phone,
+      favorite,
+      owner: req.user._id,
+    });
+    const savedContact = await newContact.save();
+    res.status(201).json(savedContact);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.post("/", validateContact, async (req, res, next) => {
+// Endpoint GET /contacts/:id do pobierania kontaktu po ID
+router.get("/:id", auth, async (req, res) => {
   try {
-    const newContact = await addContact(req.body);
-    res.status(201).json(newContact);
-  } catch (error) {
-    next(error);
+    const contact = await Contact.findOne({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+    if (!contact) {
+      return res.status(404).json({ message: "Contact not found" });
+    }
+    res.json(contact);
+  } catch (err) {
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ message: "Invalid contact ID" });
+    }
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.delete("/:contactId", async (req, res, next) => {
+// Endpoint PUT /contacts/:id do aktualizacji kontaktu po ID
+router.put("/:id", auth, validateContact, async (req, res) => {
   try {
-    const removedContact = await removeContact(req.params.contactId);
-    if (removedContact) {
-      res.status(200).json({ message: "contact deleted" });
-    } else {
-      res.status(404).json({ message: "Not found" });
+    const { name, email, phone, favorite } = req.body;
+    const updatedContact = await Contact.findOneAndUpdate(
+      { _id: req.params.id, owner: req.user._id },
+      { name, email, phone, favorite },
+      { new: true }
+    );
+    if (!updatedContact) {
+      return res.status(404).json({ message: "Contact not found" });
     }
-  } catch (error) {
-    next(error);
+    res.json(updatedContact);
+  } catch (err) {
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ message: "Invalid contact ID" });
+    }
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.put("/:contactId", validateContact, async (req, res, next) => {
+// Endpoint DELETE /contacts/:id do usuwania kontaktu po ID
+router.delete("/:id", auth, async (req, res) => {
   try {
-    const updatedContact = await updateContact(req.params.contactId, req.body);
-    if (updatedContact) {
-      res.status(200).json(updatedContact);
-    } else {
-      res.status(404).json({ message: "Not found" });
+    const deletedContact = await Contact.findOneAndDelete({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+    if (!deletedContact) {
+      return res.status(404).json({ message: "Contact not found" });
     }
-  } catch (error) {
-    next(error);
+    res.json({ message: "Contact deleted" });
+  } catch (err) {
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ message: "Invalid contact ID" });
+    }
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.patch(
-  "/:contactId/favorite",
-  validateFavorite,
-  async (req, res, next) => {
-    try {
-      const updatedContact = await updateStatusContact(
-        req.params.contactId,
-        req.body.favorite
-      );
-      if (updatedContact) {
-        res.status(200).json(updatedContact);
-      } else {
-        res.status(404).json({ message: "Not found" });
-      }
-    } catch (error) {
-      next(error);
+// Endpoint PATCH /contacts/:id/favorite do aktualizacji statusu kontaktu
+router.patch("/:id/favorite", auth, validateFavorite, async (req, res) => {
+  try {
+    const updatedContact = await Contact.findOneAndUpdate(
+      { _id: req.params.id, owner: req.user._id },
+      { favorite: req.body.favorite },
+      { new: true }
+    );
+    if (!updatedContact) {
+      return res.status(404).json({ message: "Contact not found" });
     }
+    res.json(updatedContact);
+  } catch (err) {
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ message: "Invalid contact ID" });
+    }
+    res.status(500).json({ message: "Server error" });
   }
-);
+});
 
 module.exports = router;
