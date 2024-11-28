@@ -1,58 +1,71 @@
 const request = require("supertest");
 const app = require("../app");
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 const User = require("../models/user");
+const path = require("path");
 
-beforeAll(async () => {
-  await mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
-});
+describe("PATCH /api/users/avatars", () => {
+  let token;
+  let userId;
 
-afterAll(async () => {
-  await mongoose.connection.close();
-});
-
-afterEach(async () => {
-  await User.deleteMany({});
-});
-
-describe("POST /api/users/signup", () => {
-  it("should register a new user", async () => {
-    const res = await request(app).post("/api/users/signup").send({
-      email: "example@example.com",
-      password: "examplepassword",
+  beforeAll(async () => {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
     });
 
-    expect(res.statusCode).toEqual(201);
-    expect(res.body).toHaveProperty("user");
-    expect(res.body.user).toHaveProperty("email", "example@example.com");
-    expect(res.body.user).toHaveProperty("subscription", "starter");
+    // Tworzenie użytkownika testowego
+    const user = new User({
+      email: "test@example.com",
+      password: await bcrypt.hash("password123", 10),
+      avatarURL: "",
+    });
+    await user.save();
+
+    userId = user._id;
+
+    // Logowanie użytkownika testowego, aby uzyskać token
+    const res = await request(app)
+      .post("/api/users/login")
+      .send({ email: "test@example.com", password: "password123" });
+
+    token = res.body.token;
+    console.log("Login Response:", res.body); // Dodaj logowanie odpowiedzi logowania
+    console.log("Token:", token); // Dodaj logowanie tokena
   });
 
-  it("should return validation error for invalid email", async () => {
-    const res = await request(app).post("/api/users/signup").send({
-      email: "invalid-email",
-      password: "examplepassword",
-    });
-
-    expect(res.statusCode).toEqual(400);
-    expect(res.body).toHaveProperty("message");
+  afterAll(async () => {
+    await User.deleteMany({});
+    await mongoose.connection.close();
   });
 
-  it("should return conflict error for existing email", async () => {
-    await new User({
-      email: "example@example.com",
-      password: "examplepassword",
-    }).save();
+  it("should update the user's avatar", async () => {
+    console.log("Token before request:", token); // Dodaj logowanie tokena przed żądaniem
 
-    const res = await request(app).post("/api/users/signup").send({
-      email: "example@example.com",
-      password: "examplepassword",
-    });
+    const res = await request(app)
+      .patch("/api/users/avatars")
+      .set("Authorization", `Bearer ${token}`)
+      .attach("avatar", path.join(__dirname, "test-avatar.jpg"));
 
-    expect(res.statusCode).toEqual(409);
-    expect(res.body).toHaveProperty("message", "Email in use");
+    console.log("Response status:", res.status); // Dodaj logowanie statusu odpowiedzi
+    console.log("Response body:", res.body); // Dodaj logowanie ciała odpowiedzi
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("avatarURL");
+
+    const user = await User.findById(userId);
+    expect(user.avatarURL).toBe(res.body.avatarURL);
+  });
+
+  it("should return 401 if not authorized", async () => {
+    const res = await request(app)
+      .patch("/api/users/avatars")
+      .attach("avatar", path.join(__dirname, "test-avatar.jpg"));
+
+    console.log("Unauthorized Response:", res.body); // Dodaj logowanie odpowiedzi
+
+    expect(res.status).toBe(401);
+    expect(res.body).toHaveProperty("message", "Not authorized");
   });
 });

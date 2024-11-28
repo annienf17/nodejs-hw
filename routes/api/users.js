@@ -3,6 +3,10 @@ const bcrypt = require("bcryptjs");
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
 const gravatar = require("gravatar");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs/promises");
+const Jimp = require("jimp");
 const User = require("../../models/user");
 const auth = require("../../middleware/auth");
 
@@ -21,6 +25,22 @@ const loginSchema = Joi.object({
 const subscriptionSchema = Joi.object({
   subscription: Joi.string().valid("starter", "pro", "business").required(),
 });
+
+// Konfiguracja multer do przesyłania plików
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "../../tmp"));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      `${req.user._id}-${uniqueSuffix}${path.extname(file.originalname)}`
+    );
+  },
+});
+
+const upload = multer({ storage });
 
 router.post("/signup", async (req, res) => {
   const { error } = signupSchema.validate(req.body);
@@ -147,6 +167,33 @@ router.patch("/", auth, async (req, res) => {
 
     res.json(updatedUser);
   } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Endpoint PATCH /users/avatars do aktualizacji awatara użytkownika
+router.patch("/avatars", auth, upload.single("avatar"), async (req, res) => {
+  try {
+    const { path: tempUpload, filename } = req.file;
+    const resultUpload = path.join(__dirname, "../../public/avatars", filename);
+
+    console.log("Temp upload path:", tempUpload);
+    console.log("Result upload path:", resultUpload);
+
+    // Przetwarzanie obrazu za pomocą Jimp
+    const image = await Jimp.read(tempUpload);
+    await image.resize(250, 250).writeAsync(resultUpload);
+
+    // Usunięcie pliku z folderu tmp
+    await fs.unlink(tempUpload);
+
+    const avatarURL = path.join("/avatars", filename);
+    await User.findByIdAndUpdate(req.user._id, { avatarURL });
+
+    res.json({ avatarURL });
+  } catch (err) {
+    console.error("Error processing avatar:", err);
+    await fs.unlink(req.file.path);
     res.status(500).json({ message: "Server error" });
   }
 });
