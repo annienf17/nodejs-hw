@@ -12,6 +12,8 @@ const auth = require("../../middleware/auth");
 
 const router = express.Router();
 
+console.log("Jimp version:", Jimp.read); // Sprawdzenie wersji Jimp
+
 const signupSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
