@@ -1,34 +1,27 @@
 const request = require("supertest");
-const express = require("express");
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 const User = require("../models/user");
-const usersRouter = require("../routes/api/users");
-
-const app = express();
-app.use(express.json());
-app.use("/api/users", usersRouter);
+const app = require("../app");
 
 describe("User Authentication", () => {
   let server;
 
-  beforeAll((done) => {
+  beforeAll(async () => {
     console.log("Starting server and connecting to database...");
-    server = app.listen(3000, async () => {
-      await mongoose.connect("mongodb://localhost:27017/testdb");
-      console.log("Connected to database");
-      done();
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    server = app.listen(process.env.PORT || 3000, () => {
+      console.log(`Server started on port ${process.env.PORT || 3000}`);
     });
   }, 30000); // Increase timeout to 30 seconds
 
-  afterAll((done) => {
+  afterAll(async () => {
     console.log("Closing database connection and server...");
-    mongoose.connection.close(() => {
-      server.close(() => {
-        console.log("Closed database connection and server");
-        done();
-      });
+    await mongoose.connection.close();
+    server.close(() => {
+      console.log("Closed database connection and server");
     });
   }, 30000); // Increase timeout to 30 seconds
 

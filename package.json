@@ -37,5 +37,13 @@
     "jest": "^29.7.0",
     "nodemon": "^2.0.15",
     "supertest": "^7.0.0"
-  }
+  },
+  "description": "Realizează un fork al acestui repozitoriu pentru a îndeplini temele de acasă (2-6). Fork-ul va crea un repozitoriu pe contul tău de pe http://github.com",
+  "main": ".eslintrc.js",
+  "directories": {
+    "test": "tests"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
