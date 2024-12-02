@@ -2,10 +2,17 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
+const gravatar = require("gravatar");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs/promises");
+const Jimp = require("jimp");
 const User = require("../../models/user");
 const auth = require("../../middleware/auth");
 
 const router = express.Router();
+
+console.log("Jimp version:", Jimp.read); // Sprawdzenie wersji Jimp
 
 const signupSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -21,6 +28,22 @@ const subscriptionSchema = Joi.object({
   subscription: Joi.string().valid("starter", "pro", "business").required(),
 });
 
+// Konfiguracja multer do przesyłania plików
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "../../tmp"));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      `${req.user._id}-${uniqueSuffix}${path.extname(file.originalname)}`
+    );
+  },
+});
+
+const upload = multer({ storage });
+
 router.post("/signup", async (req, res) => {
   const { error } = signupSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
@@ -34,12 +57,18 @@ router.post("/signup", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log("Hashed Password:", hashedPassword);
 
-    const user = new User({ email, password: hashedPassword });
+    const avatarURL = gravatar.url(email, { s: "200", r: "pg", d: "mm" });
+
+    const user = new User({ email, password: hashedPassword, avatarURL });
     await user.save();
 
-    res
-      .status(201)
-      .json({ user: { email: user.email, subscription: user.subscription } });
+    res.status(201).json({
+      user: {
+        email: user.email,
+        subscription: user.subscription,
+        avatarURL: user.avatarURL,
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
@@ -75,7 +104,11 @@ router.post("/login", async (req, res) => {
 
     res.status(200).json({
       token,
-      user: { email: user.email, subscription: user.subscription },
+      user: {
+        email: user.email,
+        subscription: user.subscription,
+        avatarURL: user.avatarURL,
+      },
     });
   } catch (err) {
     console.error("Server error:", err);
@@ -109,6 +142,7 @@ router.get("/current", auth, async (req, res) => {
     res.status(200).json({
       email: user.email,
       subscription: user.subscription,
+      avatarURL: user.avatarURL,
     });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
@@ -135,6 +169,33 @@ router.patch("/", auth, async (req, res) => {
 
     res.json(updatedUser);
   } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Endpoint PATCH /users/avatars do aktualizacji awatara użytkownika
+router.patch("/avatars", auth, upload.single("avatar"), async (req, res) => {
+  try {
+    const { path: tempUpload, filename } = req.file;
+    const resultUpload = path.join(__dirname, "../../public/avatars", filename);
+
+    console.log("Temp upload path:", tempUpload);
+    console.log("Result upload path:", resultUpload);
+
+    // Przetwarzanie obrazu za pomocą Jimp
+    const image = await Jimp.read(tempUpload);
+    await image.resize(250, 250).writeAsync(resultUpload);
+
+    // Usunięcie pliku z folderu tmp
+    await fs.unlink(tempUpload);
+
+    const avatarURL = path.join("/avatars", filename);
+    await User.findByIdAndUpdate(req.user._id, { avatarURL });
+
+    res.json({ avatarURL });
+  } catch (err) {
+    console.error("Error processing avatar:", err);
+    await fs.unlink(req.file.path);
     res.status(500).json({ message: "Server error" });
   }
 });

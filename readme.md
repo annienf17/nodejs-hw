@@ -1,10 +1,10 @@
 ## GoIT Node.js Course Template Homework
 
-Wykonaj forka tego repozytorium, aby wykonywać zadania domowe (2-6). Fork utworzy repozytorium na Twoim koncie na http://github.com
+Fork this repository to complete homework assignments (2-6). Forking will create a repository on your account at [GitHub](http://github.com).
 
-Dodaj mentora jako collaboratora.
+Add your mentor as a collaborator.
 
-Dla każdego zadania domowego utwórz nową gałąź (branch).
+For each homework assignment, create a new branch.
 
 - hw02
 - hw03
@@ -12,18 +12,18 @@ Dla każdego zadania domowego utwórz nową gałąź (branch).
 - hw05
 - hw06
 
-Każda nowa gałąź dla zadania powinna być tworzona z gałęzi master.
+Each new branch for an assignment should be created from the master branch.
 
-Po zakończeniu wykonania zadania domowego na swojej gałęzi, należy zrobić pull request (PR). Następnie dodaj mentora do przeglądu kodu. Dopiero po zatwierdzeniu PR przez mentora możesz scalić gałąź z zadaniem domowym do gałęzi master.
+After completing the homework assignment on your branch, create a pull request (PR). Then add your mentor for code review. Only after the PR is approved by the mentor can you merge the homework branch into the master branch.
 
-Uważnie czytaj komentarze mentora. Popraw uwagi i zrób commit na gałęzi z zadaniem domowym. Zmiany automatycznie pojawią się w PR po wysłaniu commitu z poprawkami na GitHub. Po poprawkach ponownie dodaj mentora do przeglądu kodu.
+Carefully read the mentor's comments. Address the feedback and commit the changes to the homework branch. The changes will automatically appear in the PR after pushing the commit with the fixes to GitHub. After making the corrections, add the mentor for another review.
 
-- Podczas oddawania zadania domowego podaj link do PR.
-- Kod JS jest czytelny i zrozumiały, do formatowania używany jest Prettier.
+- When submitting the homework, provide the link to the PR.
+- The JS code is readable and understandable, and Prettier is used for formatting.
 
-### Komendy:
+### Commands:
 
-- `npm start` &mdash; uruchamia serwer w trybie produkcyjnym
-- `npm run start:dev` &mdash; uruchamia serwer w trybie deweloperskim (development)
-- `npm run lint` &mdash; uruchamia sprawdzanie kodu z ESLint, należy wykonać przed każdym PR i poprawić wszystkie błędy lintera
-- `npm lint:fix` &mdash; to samo co powyższe, ale również automatycznie poprawia proste błędy.
+- `npm start` — runs the server in production mode
+- `npm run start:dev` — runs the server in development mode
+- `npm run lint` — runs code linting with ESLint, should be executed before each PR and all linting errors should be fixed
+- `npm lint:fix` — same as above, but also automatically fixes simple errors.
