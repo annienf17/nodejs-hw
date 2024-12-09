@@ -7,12 +7,14 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs/promises");
 const Jimp = require("jimp");
+const { v4: uuidv4 } = require("uuid");
+const sgMail = require("@sendgrid/mail");
 const User = require("../../models/user");
 const auth = require("../../middleware/auth");
 
 const router = express.Router();
 
-console.log("Jimp version:", Jimp.read); // Sprawdzenie wersji Jimp
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const signupSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -44,6 +46,25 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+function sendVerificationEmail(email, token) {
+  const verificationUrl = `http://localhost:3000/api/users/verify/${token}`;
+  const msg = {
+    to: email,
+    from: "a.ulanskaxxi@gmail.com", // Użyj zweryfikowanego adresu email
+    subject: "Verify your email",
+    html: `Please verify your email by clicking <a href="${verificationUrl}">here</a>.`,
+  };
+  sgMail
+    .send(msg)
+    .then(() => {
+      console.log("Verification email sent to:", email);
+    })
+    .catch((error) => {
+      console.error("Error sending verification email:", error);
+      console.error("Response body:", error.response.body);
+    });
+}
+
 router.post("/signup", async (req, res) => {
   const { error } = signupSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
@@ -55,12 +76,18 @@ router.post("/signup", async (req, res) => {
     if (existingUser) return res.status(409).json({ message: "Email in use" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log("Hashed Password:", hashedPassword);
-
     const avatarURL = gravatar.url(email, { s: "200", r: "pg", d: "mm" });
+    const verificationToken = uuidv4();
 
-    const user = new User({ email, password: hashedPassword, avatarURL });
+    const user = new User({
+      email,
+      password: hashedPassword,
+      avatarURL,
+      verificationToken,
+    });
     await user.save();
+
+    sendVerificationEmail(email, verificationToken);
 
     res.status(201).json({
       user: {
@@ -83,16 +110,15 @@ router.post("/login", async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      console.log("User not found");
       return res.status(401).json({ message: "Email or password is wrong" });
     }
 
-    console.log("Plain Password:", password);
-    console.log("Stored Hashed Password:", user.password);
+    if (!user.verify) {
+      return res.status(401).json({ message: "Email not verified" });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    console.log("Password Valid:", isPasswordValid);
     if (!isPasswordValid) {
-      console.log("Invalid password");
       return res.status(401).json({ message: "Email or password is wrong" });
     }
 
@@ -111,7 +137,6 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Server error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -179,14 +204,9 @@ router.patch("/avatars", auth, upload.single("avatar"), async (req, res) => {
     const { path: tempUpload, filename } = req.file;
     const resultUpload = path.join(__dirname, "../../public/avatars", filename);
 
-    console.log("Temp upload path:", tempUpload);
-    console.log("Result upload path:", resultUpload);
-
-    // Przetwarzanie obrazu za pomocą Jimp
     const image = await Jimp.read(tempUpload);
     await image.resize(250, 250).writeAsync(resultUpload);
 
-    // Usunięcie pliku z folderu tmp
     await fs.unlink(tempUpload);
 
     const avatarURL = path.join("/avatars", filename);
@@ -194,9 +214,33 @@ router.patch("/avatars", auth, upload.single("avatar"), async (req, res) => {
 
     res.json({ avatarURL });
   } catch (err) {
-    console.error("Error processing avatar:", err);
     await fs.unlink(req.file.path);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Endpoint do weryfikacji emaila
+router.get("/verify/:verificationToken", async (req, res) => {
+  const { verificationToken } = req.params;
+
+  console.log(`Verification token received: ${verificationToken}`);
+
+  try {
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      console.log("User not found with the provided verification token");
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.verify = true;
+    await user.updateOne({ $unset: { verificationToken: 1 } });
+
+    console.log("User verified successfully");
+    res.status(200).json({ message: "Verification successful" });
+  } catch (error) {
+    console.error("Error during email verification:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
