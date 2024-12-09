@@ -26,6 +26,10 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+const emailSchema = Joi.object({
+  email: Joi.string().email().required(),
+});
+
 const subscriptionSchema = Joi.object({
   subscription: Joi.string().valid("starter", "pro", "business").required(),
 });
@@ -241,6 +245,35 @@ router.get("/verify/:verificationToken", async (req, res) => {
   } catch (error) {
     console.error("Error during email verification:", error);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+// Endpoint do ponownego wysyłania emaila weryfikacyjnego
+router.post("/verify", async (req, res) => {
+  const { error } = emailSchema.validate(req.body);
+  if (error)
+    return res.status(400).json({ message: "missing required field email" });
+
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.verify) {
+      return res
+        .status(400)
+        .json({ message: "Verification has already been passed" });
+    }
+
+    sendVerificationEmail(email, user.verificationToken);
+
+    res.status(200).json({ message: "Verification email sent" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 });
 
