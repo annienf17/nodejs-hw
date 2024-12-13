@@ -114,7 +114,7 @@ router.post("/login", async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: "Email or password is wrong" });
+      return res.status(401).json({ message: "Email is wrong" });
     }
 
     if (!user.verify) {
@@ -123,7 +123,7 @@ router.post("/login", async (req, res) => {
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: "Email or password is wrong" });
+      return res.status(401).json({ message: "Password is wrong" });
     }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
@@ -237,8 +237,11 @@ router.get("/verify/:verificationToken", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.verify = true;
-    await user.updateOne({ $unset: { verificationToken: 1 } });
+    // verify na true i usuń token weryfikacyjny
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { verify: true }, $unset: { verificationToken: "" } }
+    );
 
     console.log("User verified successfully");
     res.status(200).json({ message: "Verification successful" });
