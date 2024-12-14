@@ -79,13 +79,12 @@ router.post("/signup", async (req, res) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(409).json({ message: "Email in use" });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
     const avatarURL = gravatar.url(email, { s: "200", r: "pg", d: "mm" });
     const verificationToken = uuidv4();
 
     const user = new User({
       email,
-      password: hashedPassword,
+      password,
       avatarURL,
       verificationToken,
     });
@@ -237,7 +236,7 @@ router.get("/verify/:verificationToken", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // verify na true i usuń token weryfikacyjny
+    // Ustaw verify na true i usuń token weryfikacyjny
     await User.updateOne(
       { _id: user._id },
       { $set: { verify: true }, $unset: { verificationToken: "" } }

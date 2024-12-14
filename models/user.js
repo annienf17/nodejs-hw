@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
   },
   verificationToken: {
     type: String,
-    required: [true, "Verify token is required"],
+    default: null,
   },
 });
 
