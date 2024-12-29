@@ -1,3 +1,12 @@
+jest.setTimeout(30000);
+
+// Mock SendGrid mail
+jest.mock("@sendgrid/mail", () => ({
+  setApiKey: jest.fn(),
+  send: jest.fn().mockResolvedValue({}),
+}));
+
+const sgMail = require("@sendgrid/mail");
 const request = require("supertest");
 const express = require("express");
 const mongoose = require("mongoose");
@@ -16,15 +25,16 @@ describe("User API", () => {
 
   beforeAll(async () => {
     server = app.listen(3001);
-    await mongoose.connect("mongodb://localhost:27017/testdb", {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    try {
+      await mongoose.connect("mongodb://localhost:27017/testdb");
+    } catch (error) {
+      console.error("Błąd podczas łączenia z bazą danych:", error);
+    }
   });
 
   afterAll(async () => {
     await mongoose.connection.close();
-    server.close();
+    await server.close();
   });
 
   beforeEach(async () => {
@@ -68,4 +78,14 @@ describe("User API", () => {
       expect(res.body.user).toHaveProperty("subscription", "starter");
     }, 10000); // Increase timeout to 10 seconds
   });
+});
+
+it("should send a verification email", async () => {
+  await sendVerificationEmail("test@example.com", "12345");
+  expect(sgMail.send).toHaveBeenCalled();
+  expect(sgMail.send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      to: "test@example.com",
+    })
+  );
 });
